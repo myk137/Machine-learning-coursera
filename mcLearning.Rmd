@@ -1,0 +1,161 @@
+---
+title: "Coursera Practical Machine Learning Project"
+author: "created by myk137"
+date: "1/9/2021"
+output: 
+  html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website: [http://groupware.les.inf.puc-rio.br/har](http://groupware.les.inf.puc-rio.br/har). 
+
+### Methodology
+
+2 datasets are used in this project. First is training dataset to train our model which will be divided into two parts, one (75% dataset) to train our model and other (25% dataset) to validate it. Second dataset is testing dataset containing 20 observations whose outcome will be predicted to answer *Prediction Quiz on Coursera*. Outcome in our dataset is named by *classe*.
+
+**Methodology Steps:-**
+
+* Loading packages
+
+* Loading raw data
+
+* Data pre-processing includes removing four kinds of columns
+
+  + empty columns
+
+  + columns containing NA values
+  
+  + columns representing highly correlated predictors
+  
+  + columns containing non-predictors
+  
+* Splitting training data into two parts as discussed above
+
+* Performing cross validation, "cv" method is used
+
+* Fitting machine learning models and choosing the most accurate
+
+Dataset courtesy to:- Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+For more information on methodology used in this project, click [https://topepo.github.io/caret/pre-processing.html](here).
+
+### Loading Packages
+
+```{r message=FALSE}
+library(caret); library(ggplot2); library(rattle)
+```
+
+### Loading Raw Data
+
+```{r}
+training_raw <- read.csv("pml-training.csv")
+dim(training_raw)
+testing_raw <- read.csv("pml-testing.csv")
+dim(testing_raw)
+```
+
+### Data Pre-processing
+
+#### Removing columns having some NA values
+```{r}
+tr <- training_raw[ , colSums(is.na(training_raw)) == 0]
+dim(tr)
+te <- testing_raw[ , colSums(is.na(testing_raw)) == 0]
+dim(te)
+```
+
+#### Removing first 7 non-predictor columns
+```{r}
+tr <- tr[,-c(1:7)]
+dim(tr)
+te <- te[,-c(1:7)]
+dim(te)
+```
+
+#### Eliminating empty columns in training dataset
+```{r}
+nzv <- nearZeroVar(tr, saveMetrics= TRUE)
+tr <- tr[,!nzv[,4]]
+dim(tr)
+```
+
+#### Eliminating highly correlated predictors
+```{r, cache=TRUE}
+descrCor <- cor(tr[,-dim(tr)[2]])
+highlyCorDescr <- findCorrelation(descrCor, cutoff = .75)
+tr <- tr[,-highlyCorDescr]
+dim(tr)
+te <- te[,-highlyCorDescr]
+dim(te)
+```
+
+### Spliting training data into training & validation
+```{r}
+set.seed(123)
+inTrain <- createDataPartition(y = tr$classe, p = .75, list = FALSE)
+training <- tr[inTrain,]
+dim(training)
+validation <- tr[-inTrain,]
+dim(validation)
+```
+
+### Cross Validation
+```{r, cache=TRUE}
+fitControl <- trainControl(method = "cv", number = 5)
+```
+
+### Machine Learning
+
+Following 3 models will be used to fit and predict data:
+
+* Decision tree
+
+* Gradient boosting method
+
+* Random forest
+
+**confx$table** output compares observed and predicted outcome.
+
+**confx$overall[1]** output gives model accuracy.
+
+#### Model 1 - Decision Tree
+```{r, cache=TRUE}
+set.seed(124)
+fit1 <- train(classe ~ ., method="rpart", data=training, trControl=fitControl)
+fancyRpartPlot(fit1$finalModel)
+pred1 <- predict(fit1,newdata=validation)
+conf1 <- confusionMatrix(pred1,factor(validation$classe))
+conf1$table
+conf1$overall[1]
+plot(conf1$table, main="Accuracy")
+```
+
+#### Model 2 - Gradient Boosting Method
+```{r, cache=TRUE}
+set.seed(125)
+fit2 <- train(classe ~ ., method="gbm", data=training, trControl=fitControl, verbose=FALSE)
+pred2 <- predict(fit2,newdata=validation)
+conf2 <- confusionMatrix(pred2,factor(validation$classe))
+conf2$table
+conf2$overall[1]
+plot(conf2$table, main="Accuracy")
+```
+
+#### Model 3 - Random Forest
+```{r, cache=TRUE}
+set.seed(126)
+fit3 <- train(classe ~ ., method="rf", data=training, trControl=fitControl, verbose=FALSE)
+pred3 <- predict(fit3,newdata=validation)
+conf3 <- confusionMatrix(pred3,factor(validation$classe))
+conf3$table
+conf3$overall[1]
+plot(conf3$table, main="Accuracy")
+```
+
+#### **Random forest will be used since it has the best accuracy.**
